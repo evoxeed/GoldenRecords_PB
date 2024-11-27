@@ -25,6 +25,10 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+dirty.csv
+output_emails.txt
+output_zips.txt
+phone_output.txt
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
