@@ -2,7 +2,9 @@ import pandas as pd
 
 pd.options.mode.chained_assignment = None
 # Загружаем данные
-df = pd.read_csv("data/dirty.csv", low_memory=False)
+csvInputPath = "data/dirty.csv"
+csvOutputPath = "data/golden_records.csv"
+df = pd.read_csv(csvInputPath, low_memory=False)
 
 # Извлекаем нужные столбцы в goldenRecord
 goldenRecord = df[["client_id", "client_first_name", "client_middle_name", "client_last_name", "client_fio_full", 
@@ -21,35 +23,34 @@ goldenRecord['update_date'] = pd.to_datetime(goldenRecord['update_date'], errors
 
 # Множество для хранения уникальных ИНН 
 seen_inns = {}
-
-    # Записываем заголовки
+# Заполнем хэш-таблицу
 for index, row in goldenRecord.iterrows():
-    inn = str(row['client_inn'])  # Получаем ИНН в виде строки
+    inn = str(row['client_inn'])
 
-# Проверяем, какие колонки имеют ненулевые значения
+    # Проверка на ненулевые знч.
     non_null_columns = row[(row.notnull()) & (row != "")].index.tolist()
 
-# Если ИНН еще не встречался, записываем его в файл
+    # Если ИНН еще не записан, записываем его в хэш
     if inn not in seen_inns:
-        seen_inns[inn] = [row['update_date'], row] # Сохраняем дату последней записи для этого ИНН и index строки
+        seen_inns[inn] = [row['update_date'], row] # Сохраняем дату последней записи
         
     else:
         last_update = seen_inns[inn][0]  # Дата последней записи для этого ИНН
     
-    # # Если текущая запись более актуальная (с более поздней датой), обновляем данные
+        # Обновляем данные
         if row['update_date'] > last_update:
             seen_inns[inn][0] = row['update_date']  # Обновляем дату для ИНН
         
-            for i in non_null_columns:
+            for i in non_null_columns: #Дополняем ряд инфой
                 seen_inns[inn][1][i] = row[i]
 
  
-with open('data/golden_records4.csv', 'w', newline='', encoding='utf-8') as f:
+# Заполняем файл
+with open(csvOutputPath, 'w', newline='', encoding='utf-8') as f:
     f.write('\t'.join(goldenRecord.columns) + '\n')
     for inn, data in seen_inns.items():
         record = data[1]  # Достаем словарь с данными
         row = [record.get(column, '') for column in goldenRecord.columns]  # Получаем значения по заголовкам
-        f.write('/t'.join(map(str, row)) + '\n')
+        f.write('\t'.join(map(str, row)) + '\n')
 
-# Уведомление о завершении записи
 print("'Золотая запись' была записана в 'golden_records.csv'.")
