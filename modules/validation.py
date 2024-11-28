@@ -7,7 +7,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 def is_non_empty(input_value):
-    return bool(input_value.strip())
+    return bool(str(input_value).strip())
 
 def is_number(s):
     try:
@@ -109,6 +109,6 @@ validationFunctions = {
 
 def valid_cells(data):
     with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(validationFunctions[list(validationFunctions.keys())[index]], column) for index, column in enumerate(data, start=0)]
+        futures = [executor.submit(validationFunctions[list(validationFunctions.keys())[index]], column) for index, column in enumerate(data)]
         results = [future.result() for future in futures]
-    return [index for index, result in enumerate(results) if result]
+    return [index + 1 for index, result in enumerate(results) if result]
