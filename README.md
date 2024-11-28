@@ -10,8 +10,9 @@ pip install -r requirements.txt
   (путь до файла определён в файле main.py - переменная csvInputPath)
 
 3. Запуск программы
+```
 bash 
 python main.py
-
+```
 4. Готовая таблица по умолчанию сохраняется в файл golden_records.csv в папке data/
   (путь до файла определён в файле main.py - переменная csvOutputPath)
