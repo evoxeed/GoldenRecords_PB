@@ -1,9 +1,11 @@
 import pandas as pd
+import multiprocessing.dummy as mp
+from concurrent.futures import ThreadPoolExecutor
+import os
 
-pd.options.mode.chained_assignment = None
 # Загружаем данные
 csvInputPath = "data/dirty.csv"
-csvOutputPath = "data/golden_records.csv"
+csvOutputPath = "data/golden_records5.csv"
 df = pd.read_csv(csvInputPath, low_memory=False)
 
 # Извлекаем нужные столбцы в goldenRecord
@@ -19,38 +21,56 @@ goldenRecord = df[["client_id", "client_first_name", "client_middle_name", "clie
 
 # Преобразуем в нужный формат
 goldenRecord['update_date'] = pd.to_datetime(goldenRecord['update_date'], errors='coerce')
-#ИНН - целева переменная
 
 # Множество для хранения уникальных ИНН 
 seen_inns = {}
-# Заполнем хэш-таблицу
-for index, row in goldenRecord.iterrows():
+def inn_validation(inn):
+    if str(inn).isdigit():  # Проверяем, состоит ли строка только из цифр
+        if len(str(inn)) == 12 or len(str(inn)) == 10:  # Проверяем длину ИНН
+            return True
+    return False
+def process_row(row_tuple):
+    index, row = row_tuple  # Извлекаем индекс и строку
     inn = str(row['client_inn'])
-
-    # Проверка на ненулевые знч.
-    non_null_columns = row[(row.notnull()) & (row != "")].index.tolist()
-
-    # Если ИНН еще не записан, записываем его в хэш
+    
+    non_null_columns = row[(row.notnull()) & (row != "") ].index.tolist()
+    
     if inn not in seen_inns:
-        seen_inns[inn] = [row['update_date'], row] # Сохраняем дату последней записи
-        
+        seen_inns[inn] = [row['update_date'], row]  # Сохраняем дату последней записи
     else:
         last_update = seen_inns[inn][0]  # Дата последней записи для этого ИНН
-    
+        
         # Обновляем данные
         if row['update_date'] > last_update:
             seen_inns[inn][0] = row['update_date']  # Обновляем дату для ИНН
-        
-            for i in non_null_columns: #Дополняем ряд инфой
+            
+            for i in non_null_columns:  # Дополняем ряд инфой
                 seen_inns[inn][1][i] = row[i]
 
- 
-# Заполняем файл
-with open(csvOutputPath, 'w', newline='', encoding='utf-8') as f:
-    f.write('\t'.join(goldenRecord.columns) + '\n')
-    for inn, data in seen_inns.items():
-        record = data[1]  # Достаем словарь с данными
-        row = [record.get(column, '') for column in goldenRecord.columns]  # Получаем значения по заголовкам
-        f.write('\t'.join(map(str, row)) + '\n')
+# Создаем пул потоков для обработки строк
+pool = mp.Pool()
 
-print("'Золотая запись' была записана в 'golden_records.csv'.")
+# Обрабатываем строки DataFrame в параллельном режиме
+pool.map(process_row, goldenRecord.iterrows())
+
+# Закрываем пул потоков
+pool.close()
+pool.join()
+
+# Функция для записи строки в файл
+def write_row_to_file(record):
+    row = [record.get(column, '') for column in goldenRecord.columns]  # Получаем значения по заголовкам
+    return '\t'.join(map(str, row)) + '\n'
+
+max_workers = os.cpu_count()
+
+# Записываем данные в файл с использованием многопоточности
+with open(csvOutputPath, 'w', newline='', encoding='utf-8') as f:
+    f.write('\t'.join(goldenRecord.columns) + '\n')  # Записываем заголовки
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Запускаем запись строк в файл параллельно
+        futures = {executor.submit(write_row_to_file, data[1]): inn for inn, data in seen_inns.items()}
+        for future in futures:
+            f.write(future.result())  # Записываем результат в файл
+
+print("'Золотая запись' была записана в 'golden_records1.csv'.")
